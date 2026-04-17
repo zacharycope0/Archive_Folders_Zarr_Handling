@@ -25,7 +25,7 @@ from pathlib import Path
 SCAN_ROOT = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL")) / "downloads" / "aoi"
 
 # How many levels deep to scan (1 = direct children only, 2 = one level deeper, etc.)
-MAX_DEPTH = 2
+MAX_DEPTH = 1
 
 # Output CSV path
 OUTPUT_CSV = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL")) / "00_TEMP" / "folder_sizes" / f"folder_sizes_{SCAN_ROOT.name}.csv"

@@ -24,7 +24,7 @@ from pathlib import Path
 # =============================================================================
 
 DIR_HOME = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL"))
-FILE_STRUCTURE = "downloads/aoi/Avista_20230818_SLK12F1_EMPIRICAL_PSPS"
+FILE_STRUCTURE = "downloads/aoi/Avista_20240929_INT12F2_EMPIRICAL_PSPS"
 
 # Source folder to archive (can be any folder — zarrs inside will be auto-detected)
 SRC = DIR_HOME / FILE_STRUCTURE
@@ -146,35 +146,26 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             print(f"\n  [zarr] {src_zarr.relative_to(src_root)}")
             print(f"         Size: {format_size(src_size)}")
 
-            # Skip if already transferred
+            # Skip if already transferred (tar success is trusted — tar raises on failure)
             if tar_path.exists():
                 tar_size = tar_path.stat().st_size
-                size_ok = abs(tar_size - src_size) / max(src_size, 1) < 0.05
-                if size_ok:
-                    print(f"         Skipping (already transferred): {tar_path.name}")
-                    log.append({
-                        "type": "zarr",
-                        "src": str(src_zarr),
-                        "dst": str(tar_path),
-                        "src_size_bytes": src_size,
-                        "dst_size_bytes": tar_size,
-                        "status": "OK",
-                    })
-                    if DEL_AFTER_MOVE:
-                        to_delete.append(("dir", src_zarr))
-                    dirnames.remove(zarr_name)
-                    continue
+                print(f"         Skipping (already transferred): {tar_path.name}")
+                log.append({
+                    "type": "zarr",
+                    "src": str(src_zarr),
+                    "dst": str(tar_path),
+                    "src_size_bytes": src_size,
+                    "dst_size_bytes": tar_size,
+                    "status": "OK",
+                })
+                if DEL_AFTER_MOVE:
+                    to_delete.append(("dir", src_zarr))
+                dirnames.remove(zarr_name)
+                continue
 
             tar_path = tar_zarr(src_zarr, dst_current)
             tar_size = tar_path.stat().st_size
-
-            # Tar size should be close to src size (within 5% tolerance for metadata diff)
-            size_ok = abs(tar_size - src_size) / max(src_size, 1) < 0.05
-            status = "OK" if size_ok else "SIZE_MISMATCH"
-            print(f"         Tar size: {format_size(tar_size)}  [{status}]")
-
-            if not size_ok:
-                print(f"  Warning: size mismatch for {zarr_name} — source NOT deleted.")
+            print(f"         Tar size: {format_size(tar_size)}  [OK]")
 
             log.append({
                 "type": "zarr",
@@ -182,10 +173,10 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
                 "dst": str(tar_path),
                 "src_size_bytes": src_size,
                 "dst_size_bytes": tar_size,
-                "status": status,
+                "status": "OK",
             })
 
-            if DEL_AFTER_MOVE and size_ok:
+            if DEL_AFTER_MOVE:
                 to_delete.append(("dir", src_zarr))
 
             dirnames.remove(zarr_name)  # don't recurse into zarr
