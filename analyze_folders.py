@@ -22,13 +22,13 @@ from pathlib import Path
 # =============================================================================
 
 # Root directory to analyze
-SCAN_ROOT = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL"))
+SCAN_ROOT = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL")) / "downloads" / "psps" / "input_data"
 
 # How many levels deep to scan (1 = direct children only, 2 = one level deeper, etc.)
 MAX_DEPTH = 3
 
 # Output CSV path
-OUTPUT_CSV = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL")) / "folder_sizes.csv"
+OUTPUT_CSV = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL")) / "folder_sizes" / f"folder_sizes_{SCAN_ROOT.name}.csv"
 
 # Only report folders larger than this (bytes). 0 = report everything.
 MIN_SIZE_BYTES = 0
