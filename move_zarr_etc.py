@@ -24,7 +24,7 @@ from pathlib import Path
 # =============================================================================
 
 DIR_HOME = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL"))
-FILE_STRUCTURE = "downloads/psps/input_data/wfpi"
+FILE_STRUCTURE = "downloads/aoi/Avista_20230818_SLK12F1_EMPIRICAL_PSPS"
 
 # Source folder to archive (can be any folder — zarrs inside will be auto-detected)
 SRC = DIR_HOME / FILE_STRUCTURE
@@ -123,9 +123,12 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
     """
     Walk src_root, mirroring structure to dst_root.
     Zarrs are tarred; everything else is copied.
+    Already-transferred items are skipped (restart-safe).
+    Deletions are deferred to the end so an interrupted run leaves sources intact.
     Returns a log of transferred items for the CSV report.
     """
     log = []
+    to_delete = []  # (kind, path) — populated during walk, executed after
 
     for dirpath, dirnames, filenames in os.walk(src_root):
         current = Path(dirpath)
@@ -138,9 +141,29 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             src_zarr = current / zarr_name
             src_size = get_size_bytes(src_zarr)
             dst_current.mkdir(parents=True, exist_ok=True)
+            tar_path = dst_current / f"{src_zarr.name}.tar"
 
             print(f"\n  [zarr] {src_zarr.relative_to(src_root)}")
             print(f"         Size: {format_size(src_size)}")
+
+            # Skip if already transferred
+            if tar_path.exists():
+                tar_size = tar_path.stat().st_size
+                size_ok = abs(tar_size - src_size) / max(src_size, 1) < 0.05
+                if size_ok:
+                    print(f"         Skipping (already transferred): {tar_path.name}")
+                    log.append({
+                        "type": "zarr",
+                        "src": str(src_zarr),
+                        "dst": str(tar_path),
+                        "src_size_bytes": src_size,
+                        "dst_size_bytes": tar_size,
+                        "status": "OK",
+                    })
+                    if DEL_AFTER_MOVE:
+                        to_delete.append(("dir", src_zarr))
+                    dirnames.remove(zarr_name)
+                    continue
 
             tar_path = tar_zarr(src_zarr, dst_current)
             tar_size = tar_path.stat().st_size
@@ -163,8 +186,7 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             })
 
             if DEL_AFTER_MOVE and size_ok:
-                shutil.rmtree(src_zarr)
-                print(f"         Source deleted.")
+                to_delete.append(("dir", src_zarr))
 
             dirnames.remove(zarr_name)  # don't recurse into zarr
 
@@ -173,6 +195,21 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             src_file = current / fname
             dst_file = dst_current / fname
             dst_current.mkdir(parents=True, exist_ok=True)
+
+            # Skip if already transferred
+            if dst_file.exists() and dst_file.stat().st_size == src_file.stat().st_size:
+                print(f"  [file] {src_file.relative_to(src_root)}  [skipping — already transferred]")
+                log.append({
+                    "type": "file",
+                    "src": str(src_file),
+                    "dst": str(dst_file),
+                    "src_size_bytes": src_file.stat().st_size,
+                    "dst_size_bytes": dst_file.stat().st_size,
+                    "status": "OK",
+                })
+                if DEL_AFTER_MOVE:
+                    to_delete.append(("file", src_file))
+                continue
 
             print(f"  [file] {src_file.relative_to(src_root)}")
             shutil.copy2(str(src_file), str(dst_file))
@@ -192,7 +229,17 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             })
 
             if DEL_AFTER_MOVE and size_ok:
-                src_file.unlink()
+                to_delete.append(("file", src_file))
+
+    # Deferred deletions — only runs if the full walk completes
+    if DEL_AFTER_MOVE and to_delete:
+        print(f"\nDeleting {len(to_delete)} source item(s)...")
+        for kind, path in to_delete:
+            if kind == "dir":
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            print(f"  Deleted: {path}")
 
     return log
 
