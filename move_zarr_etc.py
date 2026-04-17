@@ -24,7 +24,7 @@ from pathlib import Path
 # =============================================================================
 
 DIR_HOME = Path(os.environ.get("DIR_HOME", Path.home() / "Code_WSL"))
-FILE_STRUCTURE = "downloads/psps/input_data/wfpi/2026_master"
+FILE_STRUCTURE = "downloads/psps/input_data/wfpi"
 
 # Source folder to archive (can be any folder — zarrs inside will be auto-detected)
 SRC = DIR_HOME / FILE_STRUCTURE
@@ -129,7 +129,7 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
 
     for dirpath, dirnames, filenames in os.walk(src_root):
         current = Path(dirpath)
-        rel = current.relative_to(src_root.parent)  # preserve src folder name in dst
+        rel = current.relative_to(src_root)
         dst_current = dst_root / rel
 
         # --- Handle .zarr directories ---
@@ -139,7 +139,7 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             src_size = get_size_bytes(src_zarr)
             dst_current.mkdir(parents=True, exist_ok=True)
 
-            print(f"\n  [zarr] {src_zarr.relative_to(src_root.parent)}")
+            print(f"\n  [zarr] {src_zarr.relative_to(src_root)}")
             print(f"         Size: {format_size(src_size)}")
 
             tar_path = tar_zarr(src_zarr, dst_current)
@@ -174,7 +174,7 @@ def transfer(src_root: Path, dst_root: Path) -> list[dict]:
             dst_file = dst_current / fname
             dst_current.mkdir(parents=True, exist_ok=True)
 
-            print(f"  [file] {src_file.relative_to(src_root.parent)}")
+            print(f"  [file] {src_file.relative_to(src_root)}")
             shutil.copy2(str(src_file), str(dst_file))
 
             src_size = src_file.stat().st_size
